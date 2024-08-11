@@ -1,0 +1,9 @@
+pandas 
+seaborn
+matplotlib
+nltk
+notebook
+playwright
+wordcloud
+scikit-learn
+-e .

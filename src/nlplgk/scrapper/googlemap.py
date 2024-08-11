@@ -11,11 +11,10 @@ class Business:
     """
     name: str = None
     address: str = None
-    website: str = None
     reviews_count: int = None
     reviews_average: float = None
     category: str = None
-    coordinate: str = None
+    # coordinate: str = None
 
 @dataclass
 class BusinessList:
@@ -35,12 +34,12 @@ class BusinessList:
         """saves pandas dataframe to csv file
 
         Args:
-            filename (str): filename
+            filename (str): filename 
         """
-        directory = './../data/raw'
+        directory = 'C:/Users/asus/Documents/personal_project/nlp_sentiment_lgk/data/raw'
         os.makedirs(directory, exist_ok=True)  # Create directory if it doesn't exist
         filepath = os.path.join(directory, f'{filename}.csv')
-        self.dataframe().to_csv(f'{filename}.csv', index=False)
+        self.dataframe().to_csv(filepath, index=False)  # Save the CSV file using the full path
 
 
 def main():
@@ -54,32 +53,35 @@ def main():
         # wait is added for dev phase. can remove it in production
         print('===Connection Successful===')
         
-        page.locator('//input[@id="searchboxinput"]').fill(search_for)
+        page.locator('//input[@id="searchboxinput"]').fill(search_for) # search engine
         page.keyboard.press('Enter')
         
+        # path
+        list_path = '//div[@class="Nv2PK THOPZb CpccDe "]'
+        
         # scrolling 
-        page.hover('(//div[@role="article"])[1]')
+        page.hover('(//div[@class="Nv2PK THOPZb CpccDe "])[1]')
 
         # this variable is used to detect if the bot
         # scraped the same number of listings in the previous iteration
         previously_counted = 0
         while True:
-            page.mouse.wheel(0, 100000)
+            page.mouse.wheel(0, 200000)
             
-            if page.locator('//div[@role="article"]').count() >= total:
-                listings = page.locator('//div[@role="article"]').all()[:total]
+            if page.locator(list_path).count() >= total:
+                listings = page.locator(list_path).all()[:total]
                 print(f'Total Scraped: {len(listings)}')
                 break
             else:
                 # logic to break from loop to not run infinitely 
                 # in case arrived at all available listings
-                if page.locator('//div[@role="article"]').count() == previously_counted:
-                    listings = page.locator('//div[@role="article"]').all()
+                if page.locator(list_path).count() == previously_counted:
+                    listings = page.locator(list_path).all()
                     print(f'Arrived at all available\nTotal Scraped: {len(listings)}')
                     break
                 else:
-                    previously_counted = page.locator('//div[@role="article"]').count()
-                    print(f'Currently Scraped: ', page.locator('//div[@role="article"]').count())
+                    previously_counted = page.locator(list_path).count()
+                    print(f'Currently Scraped: ', page.locator(list_path).count())
         
         business_list = BusinessList()
         
@@ -87,18 +89,15 @@ def main():
         for listing in listings:
         
             listing.click()
-            page.wait_for_selector('meta[itemprop=image]', state='visible', timeout=5000)
-            # page.wait_for_timeout(5000)
-            
-            name_xpath = '//h1[contains(@class, "fontHeadlineLarge")]'
+            # page.wait_for_selector('meta[itemprop=image]', state='visible', timeout=5000)
+            page.wait_for_timeout(5000)
+            name_xpath = '//h1[@class="DUwDvf lfPIob"]'
             address_xpath = '//button[@data-item-id="address"]//div[contains(@class, "fontBodyMedium")]'
-            website_xpath = '//a[@data-item-id="authority"]//div[contains(@class, "fontBodyMedium")]'
-            reviews_span_xpath = '//span[@role="img"]'
+            reviews_span_xpath = '(//span[@class="ceNzKf"])[1]'
             category_xpath = '//button[@class="DkEaL "]'
-            # coordinate_xpath = 'meta[itemprop=image]'
-            coordinate_element = page.locator('meta[itemprop=image]').first() 
-            
-            
+            # coordinate_xpath = '(//div[@class="mLuXec"])[1]'
+            # coordinate_element = page.locator('meta[itemprop=image]').first() 
+        
             business = Business()
             
             # extracting the feature, if exist scrape else return null
@@ -110,26 +109,40 @@ def main():
                 business.address = page.locator(address_xpath).inner_text()
             else:
                 business.address = ''
-            if page.locator(website_xpath).count() > 0:
-                business.website = page.locator(website_xpath).inner_text()
-            else:
-                business.website = ''
             if listing.locator(reviews_span_xpath).count() > 0:
                 aria_label = listing.locator(reviews_span_xpath).get_attribute('aria-label')
-                business.reviews_average = float(aria_label.split()[0].replace(',', '.').strip())
-                reviews_count_str = aria_label.split()[2].strip().replace(',', '')
-                business.reviews_count = int(reviews_count_str) if reviews_count_str.isdigit() else 0
-            else:
-                business.reviews_average = ''
-                business.reviews_count = 0
+                if aria_label:
+                    split_label = aria_label.split()
+
+                    if len(split_label) > 0:
+                        business.reviews_average = float(split_label[0].replace(',', '.').strip())
+                    else:
+                        business.reviews_average = ''
+
+                    # Check if there are enough elements for the reviews count
+                    if len(split_label) > 2:
+                        reviews_count_str = split_label[2].strip().replace(',', '')
+                        business.reviews_count = int(reviews_count_str) if reviews_count_str.isdigit() else 0
+                    else:
+                        business.reviews_count = 0
+                else:
+                    business.reviews_average = ''
+                    business.reviews_count = 0
+              
+            #     business.reviews_average = float(aria_label.split()[0].replace(',', '.').strip())
+            #     reviews_count_str = aria_label.split()[2].strip().replace(',', '')
+            #     business.reviews_count = int(reviews_count_str) if reviews_count_str.isdigit() else 0
+            # else:
+            #     business.reviews_average = ''
+            #     business.reviews_count = 0
             if page.locator(category_xpath).count() > 0:
                 business.category = page.locator(category_xpath).inner_text()
             else:
                 business.category = ''
-            if coordinate_element:
-                business.coordinate = coordinate_element.get_attribute("content")
-            else:
-                business.coordinate = ''
+            # if coordinate_xpath.count() > 0:
+            #     business.coordinate = coordinate_element.get_attribute("content")
+            # else:
+            #     business.coordinate = ''
             
             # combine the dataset extracted    
             business_list.business_list.append(business)
